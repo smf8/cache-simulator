@@ -1,26 +1,45 @@
 package cache
 
-import "container/list"
+import (
+	"container/list"
+)
+
+const (
+	HIT            = 0
+	CompulsoryMiss = 1
+	ConflictMiss   = 2
+)
 
 type Set struct {
-	l             list.List
+	l             *list.List
 	associativity int
 }
 
-func (s *Set) CheckTag(tag uint64) bool {
+func (s *Set) CheckTag(tag uint64) int {
 
-	for e := s.l.Back(); e.Next() != nil; e = e.Next() {
+	for e := s.l.Front(); e != nil; e = e.Next() {
 		if e.Value == tag {
 			// tag found in set. move it to the head
 			s.l.Remove(e)
-			s.l.PushBack(tag)
+			s.l.PushFront(tag)
 
-			return true
+			return HIT
 		}
 	}
-	// tag was not in cache, fetch it
-	s.l.Remove(s.l.Front())
-	s.l.PushBack(tag)
 
-	return false
+	// tag was not in cache, fetch it
+	var missType int
+	if s.l.Len() < s.associativity {
+		missType = CompulsoryMiss
+	} else {
+		missType = ConflictMiss
+	}
+
+	s.l.PushFront(tag)
+
+	if missType == ConflictMiss {
+		s.l.Remove(s.l.Front())
+	}
+
+	return missType
 }
