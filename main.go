@@ -12,10 +12,10 @@ import (
 
 func main() {
 	options, cmds := readInput(os.Stdin)
-	cache := cache.NewCache(options)
+	//cache := cache.NewCache(options)
 
 	fmt.Println(cmds)
-	fmt.Println(cache)
+	fmt.Println(options)
 }
 
 func readInput(reader io.Reader) (*cache.Options, []cache.CacheCmd) {
@@ -77,6 +77,8 @@ func readInput(reader io.Reader) (*cache.Options, []cache.CacheCmd) {
 	} else {
 		cacheSize.DCacheSize, _ = strconv.ParseUint(strings.TrimSpace(scanner.Text()), 10, 64)
 	}
+
+	options.CacheSize = *cacheSize
 
 	for scanner.Scan() {
 		lines := scanner.Text()
