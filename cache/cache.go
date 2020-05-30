@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-const CacheAddressSize = 32 //cache address line length in bits
+const AddressSize = 32 //cache address line length in bits
 
 type CacheCmd struct {
 	Type    int
@@ -29,7 +29,7 @@ type Cache struct {
 
 	// Tags is a 2d array that represents tag data in cache blocks
 	// first dimension is for set # and second dimension is for block # in set
-	Tags  [][]uint64
+	Tags  []Set
 	Dirty [][]bool // Dirty is same as Tags, but it only contains a flag
 }
 
@@ -40,18 +40,19 @@ func NewCache(options *Options) *Cache {
 	c.OffsetBits = uint64(math.Log2(float64(options.BlockSize)))
 	c.NumberOfSets = options.CacheSize.DCacheSize / (options.Associativity * options.BlockSize)
 	c.IndexBits = uint64(math.Log2(float64(c.NumberOfSets)))
-	c.TagBits = CacheAddressSize - c.OffsetBits - c.IndexBits
+	c.TagBits = AddressSize - c.OffsetBits - c.IndexBits
 
-	c.Tags = make([][]uint64, c.NumberOfSets)
+	c.Tags = make([]Set, c.NumberOfSets)
 	c.Dirty = make([][]bool, c.NumberOfSets)
 
-	for i := range c.Tags {
-		c.Tags[i] = make([]uint64, options.Associativity)
+	for i := range c.Dirty {
 		c.Dirty[i] = make([]bool, options.Associativity)
 	}
 
 	return c
 }
+
+// ParseCacheRequest extracts offset, set # and tag from a address line
 func (c *Cache) ParseCacheRequest(address string) *CacheRequest {
 	//convert address to hex number
 	addr, err := strconv.ParseUint(address, 16, 64)
