@@ -12,10 +12,14 @@ import (
 
 func main() {
 	options, cmds := readInput(os.Stdin)
-	//cache := cache.NewCache(options)
+	cache := cache.NewCache(options)
 
-	fmt.Println(cmds)
-	fmt.Println(options)
+	for _, cmd := range cmds {
+		cache.HandleRequest(cmd)
+	}
+
+	fmt.Print(cache.Reporter.ReportSettings())
+	fmt.Print(cache.Reporter.Report("DATA"))
 }
 
 func readInput(reader io.Reader) (*cache.Options, []cache.CacheCmd) {

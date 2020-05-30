@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"container/list"
 	"fmt"
 	"math"
 	"strconv"
@@ -20,7 +21,8 @@ type CacheRequest struct {
 }
 
 type Cache struct {
-	Options *Options
+	Options  *Options
+	Reporter Reporter
 
 	NumberOfSets uint64
 	OffsetBits   uint64 // # of offset bits
@@ -29,7 +31,7 @@ type Cache struct {
 
 	// Tags is a 2d array that represents tag data in cache blocks
 	// first dimension is for set # and second dimension is for block # in set
-	Tags  []Set
+	Tags  []*Set
 	Dirty [][]bool // Dirty is same as Tags, but it only contains a flag
 }
 
@@ -42,13 +44,20 @@ func NewCache(options *Options) *Cache {
 	c.IndexBits = uint64(math.Log2(float64(c.NumberOfSets)))
 	c.TagBits = AddressSize - c.OffsetBits - c.IndexBits
 
-	c.Tags = make([]Set, c.NumberOfSets)
+	c.Tags = make([]*Set, c.NumberOfSets)
 	c.Dirty = make([][]bool, c.NumberOfSets)
 
 	for i := range c.Dirty {
+		c.Tags[i] = &Set{list.New(), int(c.Options.Associativity)}
 		c.Dirty[i] = make([]bool, options.Associativity)
 	}
 
+	c.Reporter = Reporter{
+		CacheOptions:    c.Options,
+		ReplacesCounter: 0,
+		MissesCounter:   0,
+		AccessesCounter: 0,
+	}
 	return c
 }
 
@@ -58,7 +67,7 @@ func (c *Cache) ParseCacheRequest(address string) *CacheRequest {
 	addr, err := strconv.ParseUint(address, 16, 64)
 	if err != nil {
 		if Debug {
-			fmt.Printf("failed to parse address %s: %s", address, err.Error())
+			fmt.Printf("failed to parse address %s: %s\n", address, err.Error())
 		}
 
 		return nil
@@ -75,7 +84,7 @@ func (c *Cache) ParseCacheRequest(address string) *CacheRequest {
 	tag := addr
 
 	if Debug {
-		fmt.Printf("processing %s: offset #%d, set #%d, tag #%d", address, offset, index, tag)
+		fmt.Printf("processing %s: offset #%d, set #%d, tag #%d\n", address, offset, index, tag)
 	}
 
 	return &CacheRequest{
@@ -83,4 +92,40 @@ func (c *Cache) ParseCacheRequest(address string) *CacheRequest {
 		SetNumber: index,
 		Tag:       tag,
 	}
+}
+
+func (c *Cache) HandleRequest(cmd CacheCmd) {
+	switch cmd.Type {
+	case DataReadRef:
+		// 0 0x....   data read request
+		line := c.ParseCacheRequest(cmd.Address)
+		res := c.handleDataRead(*line)
+
+		if Debug {
+			fmt.Printf("reference to [read] %s hit is %t\n", cmd.Address, res)
+		}
+		break
+
+	case DataWriteRef:
+		// 1 0x.... data write request
+		break
+
+	case InstructionReadRef:
+		// 2 0x... instruction read request
+		break
+	}
+}
+
+func (c *Cache) handleDataRead(cr CacheRequest) bool {
+	// checking if cr's TAG is present in cache
+	res := c.Tags[cr.SetNumber].CheckTag(cr.Tag)
+	c.Reporter.AccessesCounter++
+	if res == ConflictMiss {
+		c.Reporter.MissesCounter++
+		c.Reporter.ReplacesCounter++
+	} else if res == CompulsoryMiss {
+		c.Reporter.MissesCounter++
+	}
+
+	return res == HIT
 }

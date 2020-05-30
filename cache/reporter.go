@@ -7,7 +7,7 @@ import (
 )
 
 type Reporter struct {
-	CacheOptions Options
+	CacheOptions *Options
 
 	AccessesCounter uint64
 	MissesCounter   uint64
@@ -52,12 +52,12 @@ func (r *Reporter) Report(tp string) string {
 	sb.WriteString(fmt.Sprintf("misses: %d\n", r.MissesCounter))
 
 	missRate := float64(r.MissesCounter) / float64(r.AccessesCounter)
-	missRate *= 1000
+	missRate *= 10000
 	missRate = math.Round(missRate)
-	missRate /= 1000
+	missRate /= 10000
 
 	if missRate != 0 {
-		sb.WriteString(fmt.Sprintf("miss rate: %d (hit rate %d)\n", missRate, 1-missRate))
+		sb.WriteString(fmt.Sprintf("miss rate: %.4f (hit rate %.4f)\n", missRate, 1-missRate))
 	} else {
 		sb.WriteString(fmt.Sprintf("miss rate: 0.0000 (hit rate 0.0000)\n"))
 	}
