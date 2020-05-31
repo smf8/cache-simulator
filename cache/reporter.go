@@ -12,6 +12,9 @@ type Reporter struct {
 	AccessesCounter uint64
 	MissesCounter   uint64
 	ReplacesCounter uint64
+
+	FetchedWordsCounter uint64
+	CopiedWordsCounter  uint64
 }
 
 func (r *Reporter) ReportSettings() string {
@@ -63,6 +66,14 @@ func (r *Reporter) Report(tp string) string {
 	}
 
 	sb.WriteString(fmt.Sprintf("replace: %d\n", r.ReplacesCounter))
+
+	return sb.String()
+}
+func (r *Reporter) ReportMemoryBus() string {
+	sb := new(strings.Builder)
+	sb.WriteString(fmt.Sprintf("	TRAFFIC (in words)\n"))
+	sb.WriteString(fmt.Sprintf("demand fetch: %d\n", r.FetchedWordsCounter))
+	sb.WriteString(fmt.Sprintf("copies back: %d\n", r.CopiedWordsCounter))
 
 	return sb.String()
 }
