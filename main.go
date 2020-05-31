@@ -22,7 +22,7 @@ func main() {
 	c.FlushDirty()
 
 	fmt.Print(c.DataReporter.ReportSettings())
-	fmt.Printf("\n***CACHE STATISTICS***\n")
+	fmt.Printf("***CACHE STATISTICS***\n")
 	fmt.Print(c.InstructionReporter.Report("INSTRUCTION"))
 	fmt.Print(c.DataReporter.Report("DATA"))
 	fmt.Print(c.DataReporter.ReportMemoryBus())
