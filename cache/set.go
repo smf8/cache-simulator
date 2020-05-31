@@ -82,7 +82,7 @@ func (s *Set) Replace(hitPolicy, missPolicy Policy, tag uint64) (int, uint64, ui
 				s.l.Front().Value.(*SetBlock).dirty = true
 
 				if Debug {
-					fmt.Printf("Replace %d WB WA miss\n", tag)
+					fmt.Printf("Replace %d WB WA miss %d written\n", tag, written)
 				}
 
 				return hit, fetched, written
@@ -158,9 +158,14 @@ func (s *Set) replace(tag uint64) (int, uint64, uint64) {
 	lruBlock := e.Value.(*SetBlock)
 	if lruBlock.dirty {
 		// block is dirty, writing to memory
+
 		if Debug {
-			fmt.Printf("dirty block replacement : %d", lruBlock.tag)
+			fmt.Printf("dirty block replacement : %d\n", lruBlock.tag)
 		}
+
+		s.l.Remove(e)
+		s.l.PushFront(&SetBlock{tag, false})
+
 		return ConflictMiss, s.o.BlockSize / WordSize, s.o.BlockSize / WordSize
 	}
 	// fetching but not writing

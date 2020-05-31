@@ -32,8 +32,9 @@ type Cache struct {
 
 	// Tags is a 2d array that represents tag data in cache blocks
 	// first dimension is for set # and second dimension is for block # in set
-	Tags  []*Set
-	Dirty [][]bool // Dirty is same as Tags, but it only contains a flag
+	Tags            []*Set
+	InstructionTags []*Set
+	Dirty           [][]bool // Dirty is same as Tags, but it only contains a flag
 }
 
 func NewCache(options *Options) *Cache {
@@ -46,10 +47,12 @@ func NewCache(options *Options) *Cache {
 	c.TagBits = AddressSize - c.OffsetBits - c.IndexBits
 
 	c.Tags = make([]*Set, c.NumberOfSets)
+	c.InstructionTags = make([]*Set, c.NumberOfSets)
 	c.Dirty = make([][]bool, c.NumberOfSets)
 
 	for i := range c.Dirty {
 		c.Tags[i] = &Set{list.New(), *c.Options}
+		c.InstructionTags[i] = &Set{list.New(), *c.Options}
 		c.Dirty[i] = make([]bool, options.Associativity)
 	}
 
@@ -107,6 +110,10 @@ func (c *Cache) FlushDirty() {
 	for _, set := range c.Tags {
 		for _, sb := range set.ToArray() {
 			if sb.dirty {
+				if Debug {
+					fmt.Printf("flushing dirty tag: %d\n", sb.tag)
+				}
+
 				c.DataReporter.CopiedWordsCounter += c.Options.BlockSize / WordSize
 			}
 		}
@@ -116,31 +123,31 @@ func (c *Cache) FlushDirty() {
 func (c *Cache) HandleRequest(cmd CacheCmd) {
 	line := c.ParseCacheRequest(cmd.Address)
 
-	switch cmd.Type {
-	case DataReadRef:
-		// 0 0x....   data read request
-		res := c.handleDataRead(*line, cmd.Type)
-		if Debug {
-			fmt.Printf("reference to [read] %s hit is %t\n", cmd.Address, res)
-		}
-		break
-
-	case DataWriteRef:
+	if cmd.Type == DataWriteRef {
 		// 1 0x.... data write request
 		res := c.handleDataWrite(*line)
 
 		if Debug {
-			fmt.Printf("reference to [write] %s hit is %t\n", cmd.Address, res)
+			fmt.Printf("reference to [write] %s hit is %t      %d\n", cmd.Address, res, c.DataReporter.CopiedWordsCounter)
 		}
-		break
+	} else {
+		if c.Options.Type == Unified {
+			res := c.handleDataRead(*line, cmd.Type)
 
-	case InstructionReadRef:
-		// 2 0x... instruction read request
-		res := c.handleDataRead(*line, cmd.Type)
-		if Debug {
-			fmt.Printf("reference to [read] instruction %s hit is %t\n", cmd.Address, res)
+			if Debug {
+				fmt.Printf("reference to [unified-read] %s hit is %t\n", cmd.Address, res)
+			}
+		} else {
+			var res bool
+			if cmd.Type == InstructionReadRef {
+				res = c.handleInstructionRead(*line)
+			} else {
+				res = c.handleDataRead(*line, cmd.Type)
+			}
+			if Debug {
+				fmt.Printf("reference to [split-read-%d] %s hit is %t\n", cmd.Type, cmd.Address, res)
+			}
 		}
-		break
 	}
 }
 
@@ -186,6 +193,24 @@ func (c *Cache) handleDataRead(cr CacheRequest, refType int) bool {
 		} else if res == CompulsoryMiss {
 			c.DataReporter.MissesCounter++
 		}
+	}
+
+	return res == HIT
+}
+
+func (c *Cache) handleInstructionRead(cr CacheRequest) bool {
+	// checking if cr's TAG is present in cache
+	res, fetched, _ := c.InstructionTags[cr.SetNumber].CheckTag(cr.Tag)
+
+	c.DataReporter.FetchedWordsCounter += fetched
+
+	c.InstructionReporter.AccessesCounter++
+
+	if res == ConflictMiss {
+		c.InstructionReporter.MissesCounter++
+		c.InstructionReporter.ReplacesCounter++
+	} else if res == CompulsoryMiss {
+		c.InstructionReporter.MissesCounter++
 	}
 
 	return res == HIT
