@@ -21,8 +21,9 @@ type CacheRequest struct {
 }
 
 type Cache struct {
-	Options  *Options
-	Reporter Reporter
+	Options             *Options
+	DataReporter        Reporter
+	InstructionReporter Reporter
 
 	NumberOfSets uint64
 	OffsetBits   uint64 // # of offset bits
@@ -48,11 +49,18 @@ func NewCache(options *Options) *Cache {
 	c.Dirty = make([][]bool, c.NumberOfSets)
 
 	for i := range c.Dirty {
-		c.Tags[i] = &Set{list.New(), int(c.Options.Associativity)}
+		c.Tags[i] = &Set{list.New(), *c.Options}
 		c.Dirty[i] = make([]bool, options.Associativity)
 	}
 
-	c.Reporter = Reporter{
+	c.DataReporter = Reporter{
+		CacheOptions:    c.Options,
+		ReplacesCounter: 0,
+		MissesCounter:   0,
+		AccessesCounter: 0,
+	}
+
+	c.InstructionReporter = Reporter{
 		CacheOptions:    c.Options,
 		ReplacesCounter: 0,
 		MissesCounter:   0,
@@ -94,13 +102,24 @@ func (c *Cache) ParseCacheRequest(address string) *CacheRequest {
 	}
 }
 
+// FlushDirty is to write dirty blocks into memory
+func (c *Cache) FlushDirty() {
+	for _, set := range c.Tags {
+		for _, sb := range set.ToArray() {
+			if sb.dirty {
+				c.DataReporter.CopiedWordsCounter += c.Options.BlockSize / WordSize
+			}
+		}
+	}
+}
+
 func (c *Cache) HandleRequest(cmd CacheCmd) {
+	line := c.ParseCacheRequest(cmd.Address)
+
 	switch cmd.Type {
 	case DataReadRef:
 		// 0 0x....   data read request
-		line := c.ParseCacheRequest(cmd.Address)
-		res := c.handleDataRead(*line)
-
+		res := c.handleDataRead(*line, cmd.Type)
 		if Debug {
 			fmt.Printf("reference to [read] %s hit is %t\n", cmd.Address, res)
 		}
@@ -108,23 +127,65 @@ func (c *Cache) HandleRequest(cmd CacheCmd) {
 
 	case DataWriteRef:
 		// 1 0x.... data write request
+		res := c.handleDataWrite(*line)
+
+		if Debug {
+			fmt.Printf("reference to [write] %s hit is %t\n", cmd.Address, res)
+		}
 		break
 
 	case InstructionReadRef:
 		// 2 0x... instruction read request
+		res := c.handleDataRead(*line, cmd.Type)
+		if Debug {
+			fmt.Printf("reference to [read] instruction %s hit is %t\n", cmd.Address, res)
+		}
 		break
 	}
 }
 
-func (c *Cache) handleDataRead(cr CacheRequest) bool {
-	// checking if cr's TAG is present in cache
-	res := c.Tags[cr.SetNumber].CheckTag(cr.Tag)
-	c.Reporter.AccessesCounter++
+func (c *Cache) handleDataWrite(cr CacheRequest) bool {
+	res, fetched, written := c.Tags[cr.SetNumber].Replace(c.Options.WritePolicy, c.Options.WriteMissPolicy, cr.Tag)
+
+	c.DataReporter.FetchedWordsCounter += fetched
+	c.DataReporter.CopiedWordsCounter += written
+	c.DataReporter.AccessesCounter++
+
 	if res == ConflictMiss {
-		c.Reporter.MissesCounter++
-		c.Reporter.ReplacesCounter++
+		c.DataReporter.MissesCounter++
+		c.DataReporter.ReplacesCounter++
 	} else if res == CompulsoryMiss {
-		c.Reporter.MissesCounter++
+		c.DataReporter.MissesCounter++
+	}
+
+	return res == HIT
+}
+
+func (c *Cache) handleDataRead(cr CacheRequest, refType int) bool {
+	// checking if cr's TAG is present in cache
+	res, fetched, written := c.Tags[cr.SetNumber].CheckTag(cr.Tag)
+
+	c.DataReporter.FetchedWordsCounter += fetched
+	c.DataReporter.CopiedWordsCounter += written
+
+	if refType == InstructionReadRef {
+		c.InstructionReporter.AccessesCounter++
+
+		if res == ConflictMiss {
+			c.InstructionReporter.MissesCounter++
+			c.InstructionReporter.ReplacesCounter++
+		} else if res == CompulsoryMiss {
+			c.InstructionReporter.MissesCounter++
+		}
+	} else {
+		c.DataReporter.AccessesCounter++
+
+		if res == ConflictMiss {
+			c.DataReporter.MissesCounter++
+			c.DataReporter.ReplacesCounter++
+		} else if res == CompulsoryMiss {
+			c.DataReporter.MissesCounter++
+		}
 	}
 
 	return res == HIT

@@ -49,7 +49,6 @@ func (r *Reporter) ReportSettings() string {
 }
 func (r *Reporter) Report(tp string) string {
 	sb := new(strings.Builder)
-	sb.WriteString(fmt.Sprintf("\n***CACHE STATISTICS***\n"))
 	sb.WriteString(fmt.Sprintf("%s\n", tp))
 	sb.WriteString(fmt.Sprintf("accesses: %d\n", r.AccessesCounter))
 	sb.WriteString(fmt.Sprintf("misses: %d\n", r.MissesCounter))
@@ -59,7 +58,7 @@ func (r *Reporter) Report(tp string) string {
 	missRate = math.Round(missRate)
 	missRate /= 10000
 
-	if missRate != 0 {
+	if r.AccessesCounter != 0 {
 		sb.WriteString(fmt.Sprintf("miss rate: %.4f (hit rate %.4f)\n", missRate, 1-missRate))
 	} else {
 		sb.WriteString(fmt.Sprintf("miss rate: 0.0000 (hit rate 0.0000)\n"))
@@ -71,7 +70,7 @@ func (r *Reporter) Report(tp string) string {
 }
 func (r *Reporter) ReportMemoryBus() string {
 	sb := new(strings.Builder)
-	sb.WriteString(fmt.Sprintf("	TRAFFIC (in words)\n"))
+	sb.WriteString(fmt.Sprintf("TRAFFIC (in words)\n"))
 	sb.WriteString(fmt.Sprintf("demand fetch: %d\n", r.FetchedWordsCounter))
 	sb.WriteString(fmt.Sprintf("copies back: %d\n", r.CopiedWordsCounter))
 

@@ -12,14 +12,20 @@ import (
 
 func main() {
 	options, cmds := readInput(os.Stdin)
-	cache := cache.NewCache(options)
+	c := cache.NewCache(options)
 
 	for _, cmd := range cmds {
-		cache.HandleRequest(cmd)
+		c.HandleRequest(cmd)
 	}
 
-	fmt.Print(cache.Reporter.ReportSettings())
-	fmt.Print(cache.Reporter.Report("DATA"))
+	// write whatever that is dirty
+	c.FlushDirty()
+
+	fmt.Print(c.DataReporter.ReportSettings())
+	fmt.Printf("\n***CACHE STATISTICS***\n")
+	fmt.Print(c.InstructionReporter.Report("INSTRUCTION"))
+	fmt.Print(c.DataReporter.Report("DATA"))
+	fmt.Print(c.DataReporter.ReportMemoryBus())
 }
 
 func readInput(reader io.Reader) (*cache.Options, []cache.CacheCmd) {
