@@ -23,7 +23,7 @@ func main() {
 
 	fmt.Print(c.DataReporter.ReportSettings())
 	fmt.Printf("***CACHE STATISTICS***\n")
-	fmt.Print(c.InstructionReporter.Report("INSTRUCTION"))
+	fmt.Print(c.InstructionReporter.Report("INSTRUCTIONS"))
 	fmt.Print(c.DataReporter.Report("DATA"))
 	fmt.Print(c.DataReporter.ReportMemoryBus())
 }

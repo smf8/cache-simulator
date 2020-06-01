@@ -181,6 +181,7 @@ func (s *Set) ToArray() []SetBlock {
 	for e := s.l.Front(); e != nil; e = e.Next() {
 		sb := e.Value.(*SetBlock)
 		res[i] = *sb
+		i++
 	}
 
 	return res

@@ -42,7 +42,7 @@ func (r *Reporter) ReportSettings() string {
 	if r.CacheOptions.WriteMissPolicy == WriteAllocatePolicy {
 		sb.WriteString(fmt.Sprintf("Allocation policy: WRITE ALLOCATE\n"))
 	} else {
-		sb.WriteString(fmt.Sprintf("Allocation policy: NO WRITE ALLOCATE\n\n"))
+		sb.WriteString(fmt.Sprintf("Allocation policy: WRITE NO ALLOCATE\n"))
 	}
 
 	return sb.String()
