@@ -20,7 +20,7 @@ const (
 
 const WordSize = 4
 
-const Debug = true
+const Debug = false
 
 type CacheType uint64
 
