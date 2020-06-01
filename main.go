@@ -20,41 +20,53 @@ func main() {
 	}
 
 	_, cmds := readInput(r)
-	blockSize := uint64(1 << 7)
-	cacheSize := uint64(1 << 13)
-	associativity := uint64(1)
-	for {
-		if associativity > 64 {
-			break
+	for i := cache.WriteAllocatePolicy; i <= cache.NoWriteAllocatePolicy; i++ {
+		for j := cache.WriteBackPolicy; j <= cache.WriteThroughPolicy; j++ {
+			for blockSize := uint64(1 << 6); blockSize <= 128; blockSize *= 2 {
+				for cacheSize := uint64(1 << 13); cacheSize <= 1<<14; cacheSize *= 2 {
+					for associativity := uint64(2); associativity <= 4; associativity *= 2 {
+						var hitPolicy, missPolicy string
+
+						if i == cache.WriteBackPolicy {
+							hitPolicy = "WB"
+						} else {
+							hitPolicy = "WT"
+						}
+						if j == cache.WriteThroughPolicy {
+							missPolicy = "WA"
+						} else {
+							missPolicy = "NW"
+						}
+						options := &cache.Options{
+							Type:            cache.Split,
+							BlockSize:       blockSize,
+							CacheSize:       cache.CacheSize{cacheSize, cacheSize},
+							WriteMissPolicy: cache.Policy(j),
+							WritePolicy:     cache.Policy(i),
+							Associativity:   associativity,
+						}
+						c := cache.NewCache(options)
+
+						for _, cmd := range cmds {
+							c.HandleRequest(cmd)
+						}
+
+						// write whatever that is dirty
+						c.FlushDirty()
+
+						dataHitRate := 1 - (float64(c.DataReporter.MissesCounter) / float64(c.DataReporter.AccessesCounter))
+						instructionHitRate := 1 - (float64(c.InstructionReporter.MissesCounter) / float64(c.InstructionReporter.AccessesCounter))
+
+						fmt.Printf("[Instruction][%s][%s][BS#%d][CS#%d][AS#%d] -> %.6f\n", hitPolicy, missPolicy, blockSize, cacheSize, associativity, instructionHitRate)
+						fmt.Printf("[Instruction][%s][%s][BS#%d][CS#%d][AS#%d] -> %.6f\n\n", hitPolicy, missPolicy, blockSize, cacheSize, associativity, dataHitRate)
+
+					}
+				}
+			}
+			fmt.Println("*************** MP_CHANGE ****************")
 		}
-		options := &cache.Options{
-			Type:            cache.Split,
-			BlockSize:       blockSize,
-			CacheSize:       cache.CacheSize{cacheSize, cacheSize},
-			WriteMissPolicy: cache.WriteAllocatePolicy,
-			WritePolicy:     cache.WriteBackPolicy,
-			Associativity:   associativity,
-		}
-		c := cache.NewCache(options)
-
-		for _, cmd := range cmds {
-			c.HandleRequest(cmd)
-		}
-
-		// write whatever that is dirty
-		c.FlushDirty()
-
-		dataHitRate := 1 - (float64(c.DataReporter.MissesCounter) / float64(c.DataReporter.AccessesCounter))
-		instructionHitRate := 1 - (float64(c.InstructionReporter.MissesCounter) / float64(c.InstructionReporter.AccessesCounter))
-
-		fmt.Printf("[Instruction][%d] -> %.6f\n", associativity, instructionHitRate)
-		fmt.Printf("[Data][%d] -> %.6f\n\n", associativity, dataHitRate)
-
-		//<- time.After(time.Microsecond * 200)
-
-		associativity *= 2
+		fmt.Println("################# HP_CHANGE ##################")
 	}
-
 }
 
 func readInput(reader io.Reader) (*cache.Options, []cache.CacheCmd) {
