@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"code.cloudfoundry.org/bytefmt"
 	"github.com/smf8/cache-simulator/cache"
 )
 
@@ -21,10 +20,11 @@ func main() {
 	}
 
 	_, cmds := readInput(r)
-	blockSize := uint64(4)
+	blockSize := uint64(1 << 7)
 	cacheSize := uint64(1 << 13)
+	associativity := uint64(1)
 	for {
-		if blockSize > (1 << 12) {
+		if associativity > 64 {
 			break
 		}
 		options := &cache.Options{
@@ -33,7 +33,7 @@ func main() {
 			CacheSize:       cache.CacheSize{cacheSize, cacheSize},
 			WriteMissPolicy: cache.WriteAllocatePolicy,
 			WritePolicy:     cache.WriteBackPolicy,
-			Associativity:   2,
+			Associativity:   associativity,
 		}
 		c := cache.NewCache(options)
 
@@ -47,12 +47,12 @@ func main() {
 		dataHitRate := 1 - (float64(c.DataReporter.MissesCounter) / float64(c.DataReporter.AccessesCounter))
 		instructionHitRate := 1 - (float64(c.InstructionReporter.MissesCounter) / float64(c.InstructionReporter.AccessesCounter))
 
-		fmt.Printf("[Instruction][%s] -> %.6f\n", bytefmt.ByteSize(blockSize), instructionHitRate)
-		fmt.Printf("[Data][%s] -> %.6f\n\n", bytefmt.ByteSize(blockSize), dataHitRate)
+		fmt.Printf("[Instruction][%d] -> %.6f\n", associativity, instructionHitRate)
+		fmt.Printf("[Data][%d] -> %.6f\n\n", associativity, dataHitRate)
 
 		//<- time.After(time.Microsecond * 200)
 
-		blockSize *= 2
+		associativity *= 2
 	}
 
 }
