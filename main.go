@@ -21,15 +21,19 @@ func main() {
 	}
 
 	_, cmds := readInput(r)
-	cacheSize := uint64(4)
+	blockSize := uint64(4)
+	cacheSize := uint64(1 << 13)
 	for {
+		if blockSize > (1 << 12) {
+			break
+		}
 		options := &cache.Options{
 			Type:            cache.Split,
-			BlockSize:       4,
+			BlockSize:       blockSize,
 			CacheSize:       cache.CacheSize{cacheSize, cacheSize},
 			WriteMissPolicy: cache.WriteAllocatePolicy,
 			WritePolicy:     cache.WriteBackPolicy,
-			Associativity:   cacheSize / 4,
+			Associativity:   2,
 		}
 		c := cache.NewCache(options)
 
@@ -43,12 +47,12 @@ func main() {
 		dataHitRate := 1 - (float64(c.DataReporter.MissesCounter) / float64(c.DataReporter.AccessesCounter))
 		instructionHitRate := 1 - (float64(c.InstructionReporter.MissesCounter) / float64(c.InstructionReporter.AccessesCounter))
 
-		fmt.Printf("[Instruction][%s] -> %.6f\n", bytefmt.ByteSize(cacheSize), instructionHitRate)
-		fmt.Printf("[Data][%s] -> %.6f\n\n", bytefmt.ByteSize(cacheSize), dataHitRate)
+		fmt.Printf("[Instruction][%s] -> %.6f\n", bytefmt.ByteSize(blockSize), instructionHitRate)
+		fmt.Printf("[Data][%s] -> %.6f\n\n", bytefmt.ByteSize(blockSize), dataHitRate)
 
 		//<- time.After(time.Microsecond * 200)
 
-		cacheSize *= 2
+		blockSize *= 2
 	}
 
 }
